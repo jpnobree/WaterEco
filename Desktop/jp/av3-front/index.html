@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>CRUD Produtos</title>
+    <style>
+        body {
+            font-family: Arial, Helvetica, sans-serif;
+            max-width: 900px;
+            margin: 20px auto;
+            padding: 0 16px
+        }
+
+        .card {
+            border: 1px solid #ddd;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 12px
+        }
+
+        input,
+        textarea,
+        button {
+            width: 100%;
+            padding: 8px;
+            margin-top: 6px;
+            border-radius: 6px;
+            border: 1px solid #ccc
+        }
+
+        .row {
+            display: flex;
+            gap: 8px
+        }
+
+        .row>* {
+            flex: 1
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Produtos</h1>
+
+    <div class="card">
+        <h3>Cadastrar / Atualizar</h3>
+        <input id="id" type="hidden" />
+        <label>Nome</label>
+        <input id="nome" />
+        <label>Descrição</label>
+        <textarea id="descricao"></textarea>
+        <label>Preço</label>
+        <input id="preco" type="number" step="0.01" />
+        <div class="row">
+            <button id="salvar">Salvar</button>
+            <button id="limpar">Limpar</button>
+        </div>
+    </div>
+
+    <div class="card">
+        <h3>Buscar por ID</h3>
+        <div class="row">
+            <input id="searchId" placeholder="ID" />
+            <button id="buscar">Buscar</button>
+        </div>
+        <div id="resultId" style="margin-top:8px"></div>
+    </div>
+
+    <div class="card">
+        <h3>Lista</h3>
+        <button id="listar">Atualizar lista</button>
+        <div id="lista" style="margin-top:8px"></div>
+    </div>
+
+    <script>
+        const API = "http://98.93.14.4:3000";
+
+        async function listar() {
+            try {
+                const res = await fetch(API + '/products');
+                if (!res.ok) { document.getElementById('lista').innerText = 'Erro ao listar'; return; }
+                const data = await res.json();
+                const container = document.getElementById('lista');
+                container.innerHTML = '';
+                if (!Array.isArray(data) || data.length === 0) { container.innerText = 'Sem produtos'; return; }
+                data.forEach(p => {
+                    const d = document.createElement('div');
+                    d.style.borderBottom = '1px solid #eee';
+                    d.style.padding = '6px 0';
+                    d.innerHTML = `<strong>${escapeHtml(p.nome)}</strong> (#${p.id})<div>${escapeHtml(p.descricao || '')}</div><div>R$ ${p.preco || ''}</div>
+        <button onclick="editar(${p.id})">Editar</button>
+        <button onclick="deletar(${p.id})">Excluir</button>
+      `;
+                    container.appendChild(d);
+                });
+            } catch (e) {
+                document.getElementById('lista').innerText = 'Erro ao conectar';
+            }
+        }
+
+        function escapeHtml(s) { if (!s) return ''; return s.replace(/[&<"']/g, m => ({ '&': '&amp;', '<': '&lt;', '"': '&quot;', "'": '&#039;' }[m])); }
+
+        document.getElementById('salvar').addEventListener('click', async () => {
+            const id = document.getElementById('id').value;
+            const nome = document.getElementById('nome').value;
+            const descricao = document.getElementById('descricao').value;
+            const preco = document.getElementById('preco').value || null;
+            const payload = { nome, descricao, preco };
+
+            try {
+                if (id) {
+                    const res = await fetch(API + '/products/' + id, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                    if (!res.ok) throw new Error('Erro atualização');
+                    alert('Atualizado');
+                } else {
+                    const res = await fetch(API + '/products', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                    if (!res.ok) throw new Error('Erro criação');
+                    alert('Criado');
+                }
+                limpar();
+                listar();
+            } catch (e) {
+                alert(e.message);
+            }
+        });
+
+        function limpar() { document.getElementById('id').value = ''; document.getElementById('nome').value = ''; document.getElementById('descricao').value = ''; document.getElementById('preco').value = ''; }
+
+        async function editar(id) {
+            const res = await fetch(API + '/products/' + id);
+            if (!res.ok) { alert('Não encontrado'); return; }
+            const p = await res.json();
+            document.getElementById('id').value = p.id;
+            document.getElementById('nome').value = p.nome;
+            document.getElementById('descricao').value = p.descricao || '';
+            document.getElementById('preco').value = p.preco || '';
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        async function deletar(id) {
+            if (!confirm('Confirma exclusão?')) return;
+            await fetch(API + '/products/' + id, { method: 'DELETE' });
+            listar();
+        }
+
+        document.getElementById('buscar').addEventListener('click', async () => {
+            const id = document.getElementById('searchId').value;
+            if (!id) return alert('Informe ID');
+            const res = await fetch(API + '/products/' + id);
+            if (!res.ok) return document.getElementById('resultId').innerText = 'Não encontrado';
+            const p = await res.json();
+            document.getElementById('resultId').innerText = JSON.stringify(p, null, 2);
+        });
+
+        document.getElementById('limpar').addEventListener('click', limpar);
+        document.getElementById('listar').addEventListener('click', listar);
+
+        // init
+        listar();
+    </script>
+</body>
+
+</html>
